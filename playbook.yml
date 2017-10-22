@@ -1,0 +1,56 @@
+---
+- hosts: stage
+  become: yes
+
+  vars_files:
+    - vars/webserver.yml
+
+  roles:
+    - { role: nginx }
+    - { role: java }
+    - { role: firewalld, when: install_firewalld }
+    - { role: newrelic, when: install_new_relic }
+
+  tasks:
+    - name: Configure Nginx
+      block:
+        - name: Add managed vhost config file (if any vhosts are configured).
+          template:
+            src: "{{ template_default_vhost }}"
+            dest: "{{ nginx_sites_available_dir }}/{{ virtualhosts[0]['nameserver'] }}.conf"
+            mode: 0644
+            force: yes
+          with_items: "{{ virtualhosts }}"
+          when: virtualhosts is defined
+
+        - name: Copy default vhost configuration in place.
+          template:
+            src:   "{{ template_default_vhost}}"
+            dest:  "{{ nginx_default_vhost_path }}"
+            owner: "{{ root_owner }}"
+            group: "{{ root_group }}"
+            mode:  0644
+            force: yes
+          when: virtualhosts is not defined
+          notify: Restart nginx
+
+        - name: Link sites-available and sites-enabled
+          file:
+            src: "{{ nginx_sites_available_dir }}/{{ virtualhosts[0]['nameserver'] }}.conf"
+            dest: "{{ nginx_sites_enabled_dir }}/{{ virtualhosts[0]['nameserver'] }}.conf"
+            state: link
+            force: yes
+          with_items: "{{ virtualhosts }}"
+          when: virtualhosts is defined
+          notify: Restart nginx
+
+        - name: Set (httpd_can_network_connect) flag on and keep it persistent across reboots
+          seboolean:
+            name: httpd_can_network_connect
+            state: yes
+            persistent: yes
+
+        - name: Ensure nginx is restarted and enabled to start at boot.
+          systemd: name=nginx.service daemon_reload=yes state=restarted enabled=yes
+      become: true
+      become_user: "{{ ansible_user }}"

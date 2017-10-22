@@ -1,0 +1,17 @@
+---
+- name: Ensure firewalld is installed.
+  yum: name=firewalld state=installed
+
+- name: Ensure firewalld is started and enabled to start at boot.
+  service: name=firewalld state=started enabled=yes
+
+- name: Firewall settings
+  firewalld:
+    port: "{{ item.port }}"
+    permanent: "{{ item.permanent }}"
+    state: enabled
+  with_items:
+    - "{{ firewalld_service_accept }}"
+
+- name: Reload firewall settings
+  shell: firewall-cmd --reload

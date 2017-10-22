@@ -1,0 +1,16 @@
+---
+- name: Install newrelic repo.
+  yum:
+    name: "{{ newrelic_repo_url }}"
+    state: present
+
+- name: Install newrelic-sysmond
+  yum:
+    name: newrelic-sysmond
+    state: installed
+
+- name: load licence_key
+  shell: nrsysmond-config --set license_key= "{{ license_key }}"
+
+- name: Ensure newrelic daemon is started and enabled to start at boot.
+  service: name=newrelic-sysmond state=started enabled=yes

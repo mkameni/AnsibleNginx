@@ -1,0 +1,35 @@
+---
+ansible_distribution_major_version: 7
+
+nginx_user: 'nginx'
+nginx_group: 'nginx'
+
+root_owner: 'root'
+root_group: 'root'
+
+default_listen: 80
+default_server_name: 'localhost'
+default_access_log_file: '{{ nginx_log_dir }}/{{ default_server_name }}-access.log'
+default_error_log_file: '{{ nginx_log_dir }}/{{ default_server_name }}-error.log'
+default_root: '/usr/share/nginx/html'
+default_index: 'index.php index.html index.htm'
+
+template_default_vhost: "nginx/sites-available/{{ servername }}.conf.j2"
+
+nginx_fastcgi_pass: "127.0.0.1:9000"
+
+virtualhosts:
+  - nameserver: "{{ servername }}"
+    listen: "80"
+    access_log_file: "/var/log/nginx/{{ servername }}-access.log"
+    error_log_file: "/var/log/nginx/{{ servername }}-error.log"
+    root: "/var/www/{{ servername }}/{{ web_root }}"
+    index: "index.php index.htm index.html"
+    is_ssl: "false"
+    auth_file: ""
+    is_php: true
+
+firewalld_service_accept:
+  - { port: '22/tcp', permanent: true }
+  - { port: '80/tcp', permanent: true }
+  - { port: '443/tcp', permanent: true }

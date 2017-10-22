@@ -1,0 +1,176 @@
+{% if adaware_vhost == "" %}
+server {
+
+  listen        {{ default_listen }} default_server;
+  server_name   {{ default_server_name }};
+
+  access_log    {{ default_access_log_file }};
+  error_log     {{ default_error_log_file }};
+
+  location / {
+    root         {{ default_root }};
+    index        {{ default_index }};
+    try_files    $uri $uri/ /index.html;
+  }
+
+  error_page 404 /404.html;
+  error_page 500 502 503 504 /50x.html;
+
+  location = /50x.html {
+    root /usr/share/nginx/www;
+  }
+
+  location ~ .php$ {
+    try_files $uri =404;
+    fastcgi_pass {{ nginx_fastcgi_pass }};
+    fastcgi_index index.php;
+    fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+    include fastcgi_params;
+  }
+
+}
+{% else %}
+server {
+
+  {% if adaware_vhost.is_ssl %}
+  listen 443;
+  # Add certificates right here
+  {% else %}
+  listen        {{ adaware_vhost.listen }};
+  {% endif %}
+
+    server_name {{ adaware_vhost.server_name }};
+
+    access_log  {{ adaware_vhost.access_log_file }};
+    error_log   {{ adaware_vhost.error_log_file }};
+
+    root        {{ adaware_vhost.root }};
+
+    index       {{ adaware_vhost.index }};
+
+    error_page 404 /404.html;
+    error_page 500 502 503 504 /50x.html;
+
+    gzip on;
+    gzip_comp_level 6;
+    gzip_http_version 1.0;
+    gzip_proxied any;
+    gzip_min_length 1100;
+    gzip_buffers 16 8k;
+    gzip_types text/plain text/css application/json application/x-javascript application/javascript text/xml application/xml application/rss+xml text/javascript image/svg+xml application/vnd.ms-fontobject application/x-font-ttf font/opentype;
+
+    # Disable for IE < 6 because there are some known problems
+    gzip_disable "MSIE [1-6].(?!.*SV1)";
+
+    # Add a vary header for downstream proxies to avoid sending cached gzipped files to IE6
+    gzip_vary on;
+
+    location = /favicon.ico {
+        log_not_found off;
+        access_log off;
+    }
+
+    location = /robots.txt {
+        allow all;
+        log_not_found off;
+        access_log off;
+    }
+
+    # Very rarely should these ever be accessed outside of your lan
+    location ~* \.(txt|log)$ {
+        allow 10.35.0.0/24;
+        deny all;
+    }
+
+    location ~ \..*/.*\.php$ {
+        return 403;
+    }
+
+    location ~ ^/sites/.*/private/ {
+        return 403;
+    }
+
+    # Allow "Well-Known URIs" as per RFC 5785
+    location ~* ^/.well-known/ {
+        allow all;
+    }
+
+    # Block access to "hidden" files and directories whose names begin with a
+    # period. This includes directories used by version control systems such
+    # as Subversion or Git to store control files.
+    location ~ (^|/)\. {
+        return 403;
+    }
+
+    location /ASE-2017 {
+        try_files $uri $uri/ /index.html?$query_string;
+    }
+
+    location / {
+        # try_files $uri @rewrite; # For Drupal <= 6
+        try_files $uri $uri/ /index.php?$args; # For Drupal >= 7
+        #try_files $uri $uri/ /index.php?$args; # For Drupal >= 7
+    }
+
+    location @rewrite {
+        rewrite ^/(.*)$ /index.php?q=$1;
+    }
+
+    # Don't allow direct access to PHP files in the vendor directory.
+    location ~ /vendor/.*\.php$ {
+        deny all;
+        return 404;
+    }
+
+    location ~ '\.php$|^/update.php' {
+        fastcgi_split_path_info ^(.+?\.php)(|/.*)$;
+        add_header  X-qs  $query_string;
+        add_header  X-args  $args;
+        include fastcgi_params;
+        fastcgi_param SERVER_SOFTWARE nginx/adaware;
+        fastcgi_param HTTP_PROXY "";
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_param PATH_INFO $fastcgi_path_info;
+        fastcgi_param QUERY_STRING $query_string;
+        fastcgi_param SERVER_PORT 443;
+        fastcgi_param HTTPS on;
+        fastcgi_intercept_errors on;
+        fastcgi_pass {{ nginx_fastcgi_pass }};
+    }
+
+    # Fighting with Styles? This little gem is amazing.
+    location ~ ^/sites/.*/files/styles/ { # For Drupal >= 7
+        try_files $uri @rewrite;
+    }
+
+    # Handle private files through Drupal. Private file's path can come
+    # with a language prefix.
+    location ~ ^(/[a-z\-]+)?/system/files/ { # For Drupal >= 7
+        try_files $uri /index.php?$query_string;
+    }
+
+    location ~* \.(eot|otf|ttf|woff|woff2)$ {
+        add_header Access-Control-Allow-Origin *;
+    }
+
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico)$ {
+        expires 2d;
+        add_header Cache-Control "public, no-transform";
+    }
+
+    location ~* \.(jpg|jpeg|gif|png)$ {
+        expires 365d;
+    }
+
+    location ~* \.(pdf|css|html|js|swf)$ {
+        expires 2d;
+    }
+
+    #location ~* \.(js|css|png|jpg|jpeg|gif|ico|pdf|html|swf)$ {
+    #    expires max;
+    #    log_not_found off;
+    #}
+
+}
+
+{% endif %}

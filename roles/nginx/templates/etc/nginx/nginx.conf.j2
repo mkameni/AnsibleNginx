@@ -1,0 +1,73 @@
+# Generate by adaware.nginx
+
+user {{ nginx_user }};
+worker_processes {{ nginx_worker_processes }};
+
+error_log {{ nginx_error_log }};
+pid {{ nginx_pid_file }};
+
+events {
+    worker_connections {{ nginx_events_worker_connections }};
+    multi_accept {{ nginx_events_multi_accept }};
+}
+
+http {
+    server_tokens                 {{ nginx_server_tokens }};
+
+    default_type                  {{ nginx_default_type }};
+    charset_types                 {{ nginx_charset_types }};
+    fastcgi_hide_header           X-Powered-By;
+
+    add_header                    X-Xss-Protection "1; mode=block" always;
+    add_header                    X-Frame-Options "SAMEORIGIN" always;
+    add_header                    Content-Security-Policy "default-src https: data: 'unsafe-inline' 'unsafe-eval'" always;
+    add_header                    Strict-Transport-Security "max-age=31536000; includeSubdomains" always;
+
+    sendfile                      {{ nginx_sendfile }};
+
+    tcp_nopush                    {{ nginx_tcp_nopush }};
+    tcp_nodelay                   {{ nginx_tcp_nodelay }};
+
+    keepalive_timeout             {{ nginx_keepalive_timeout }};
+    keepalive_requests            {{ nginx_keepalive_requests }};
+
+    gzip                          {{ nginx_gzip }};
+
+    variables_hash_max_size       {{ nginx_variables_hash_max_size }};
+    variables_hash_bucket_size    {{ nginx_variables_hash_bucket_size }};
+
+    server_names_hash_bucket_size {{ nginx_server_names_hash_bucket_size }};
+
+    types_hash_max_size           {{ nginx_types_hash_max_size }};
+    types_hash_bucket_size        {{ nginx_types_hash_bucket_size}};
+
+    client_max_body_size          {{ nginx_client_max_body_size }};
+
+    log_format  main              {{ nginx_http_log_format|indent(23) }};
+    log_format  le_json           '{ "ng_timestamp": "$time_iso8601", '
+                       '"ng_host": "$host", '
+                       '"remote_addr": "$remote_addr", '
+                       '"remote_user": "$remote_user", '
+                       #'"remote_cc": "$geoip_country_code", '
+                       '"body_bytes_sent": "$body_bytes_sent", '
+                       '"request_time": "$request_time", '
+                       '"status": "$status", '
+                       '"scheme": "$scheme", '
+                       '"uri":"$request_uri", '
+                       '"proto":"$server_protocol", '
+                       '"method": "$request_method", '
+                       '"referer": "$http_referer", '
+                       '"upstream": "$upstream_addr", '
+                       '"upstream_response_time": "$upstream_response_time", '
+                       '"user_agent": "$http_user_agent" }';
+
+    {% if nginx_proxy_cache_path %}
+    proxy_cache_path {{ nginx_proxy_cache_path }};
+    {% endif %}
+    access_log  {{ nginx_access_log }};
+    include     {{ nginx_mine_types }};
+    include     {{ nginx_config_dir_default }}/*.conf;
+    {% if nginx_config_dir_default != nginx_sites_enabled_dir %}
+    include     {{ nginx_sites_enabled_dir }}/*.conf;
+    {% endif %}
+}

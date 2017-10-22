@@ -1,0 +1,57 @@
+---
+- name: Ensure epel-release installed
+  yum: update_cache=yes name=epel-release state=installed
+
+# install tasks.
+- name: Install nginx
+  yum: name=nginx state=installed
+  when: nginx_install_service
+  notify: Restart nginx
+
+- name: Copy nginx configuration in place.
+  template:
+    src:   "etc/nginx/nginx.conf.j2"
+    dest:  "{{ nginx_conf_file_path }}"
+    owner: "root"
+    group: "root"
+    mode:  0644
+    force: yes
+  when: nginx_install_service
+  notify: Restart nginx
+
+- name: Remove all configurations
+  file:
+    path: "{{ item }}"
+    state: absent
+    force: yes
+  with_items:
+    - '{{ nginx_sites_enabled_dir }}'
+    - '{{ nginx_sites_available_dir }}'
+
+- name: Check nginx vhost config file
+  stat:
+    path: "{{ nginx_default_vhost_path }}"
+  register: adaware_vhost
+
+- name: Remove nginx vhost config file (if configured).
+  file:
+    path: "{{ nginx_default_vhost_path }}"
+    state: absent
+    force: yes
+  when: adaware_vhost.stat.exists
+
+- name: Create default nginx directories
+  file:
+    path:  "{{ item }}"
+    state: directory
+    owner: "root"
+    group: "root"
+    mode: 0755
+    force: yes
+  when: virtualhosts != ""
+  with_items:
+    - '{{ nginx_sites_available_dir }}'
+    - '{{ nginx_sites_enabled_dir }}'
+
+- name: Ensure nginx is started and enabled to start at boot.
+  service: name=nginx state=started enabled=yes
